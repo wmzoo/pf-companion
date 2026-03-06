@@ -1,6 +1,6 @@
 'use strict';
 // CONFIG: Replace with your Cloudflare Worker URL
-const PROXY_URL = 'https://pf-proxy.neal-cronkite.workers.dev';
+const PROXY_URL = 'https://YOUR-WORKER.YOUR-NAME.workers.dev';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -595,9 +595,8 @@ async function streamEntry(entry, contentEl) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'gemini-2.5-flash',
       max_tokens: 1500,
-      stream: true,
       system: 'You are a Pathfinder 1E rules expert. Output ONLY raw HTML. Never use markdown code fences. Never output any text before or after the HTML div.',
       messages: [{ role: 'user', content: buildPrompt(entry) }],
     }),
@@ -612,7 +611,6 @@ async function streamEntry(entry, contentEl) {
   const decoder = new TextDecoder();
   let buffer = '', html = '';
 
-  // Set up a live-streaming container
   contentEl.innerHTML = '<div class="stat-block stream-cursor" id="stream-target"></div>';
   const target = document.getElementById('stream-target');
   const scroll = contentEl.closest('.entry-scroll') || contentEl;
@@ -623,7 +621,7 @@ async function streamEntry(entry, contentEl) {
 
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split('\n');
-    buffer = lines.pop(); // keep incomplete line
+    buffer = lines.pop();
 
     for (const line of lines) {
       if (!line.startsWith('data: ')) continue;
@@ -631,8 +629,10 @@ async function streamEntry(entry, contentEl) {
       if (data === '[DONE]') continue;
       try {
         const evt = JSON.parse(data);
-        if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
-          html += evt.delta.text;
+        // Gemini SSE format: candidates[0].content.parts[0].text
+        const chunk = evt?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (chunk) {
+          html += chunk;
           const clean = html.replace(/^```html?\s*/i, '').replace(/```\s*$/, '');
           target.innerHTML = clean;
           scroll.scrollTop = scroll.scrollHeight;
