@@ -1,6 +1,6 @@
 'use strict';
 // CONFIG: Replace with your Cloudflare Worker URL
-const PROXY_URL = 'https://pf-proxy.neal-cronkite.workers.dev';
+const PROXY_URL = 'https://YOUR-WORKER.YOUR-NAME.workers.dev';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -416,6 +416,14 @@ const CLASSES = [
   "Swashbuckler","Vigilante","Warpriest","Witch","Wizard",
 ];
 
+const RACES = [
+  "Dwarf","Elf","Gnome","Half-Elf","Half-Orc","Halfling","Human",
+  "Aasimar","Catfolk","Changeling","Dhampir","Drow","Fetchling","Gillman",
+  "Goblin","Grippli","Ifrit","Kitsune","Kobold","Merfolk","Nagaji",
+  "Orc","Oread","Ratfolk","Samsaran","Strix","Suli","Svirfneblin",
+  "Sylph","Tengu","Tiefling","Undine","Vanara","Vishkanya","Wayang",
+];
+
 // ═══════════════════════════════════════════════════════════════════════════
 // INDEXEDDB — persistent entry cache
 // ═══════════════════════════════════════════════════════════════════════════
@@ -447,7 +455,7 @@ function dbSet(id, html) {
 // STATE
 // ═══════════════════════════════════════════════════════════════════════════
 const SK = 'pfc_v6';
-const TYPES = ['Spell','Feat','Class','Item','Monster'];
+const TYPES = ['Spell','Feat','Class','Race','Item','Monster'];
 
 let S = { chars:[], activeChar:null, bookmarks:{}, folders:{}, folderCollapsed:{}, typeFilter:null, results:[], activeEntry:null };
 
@@ -490,17 +498,140 @@ function loadState() {
 // URL HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 function aonUrl(name, type) {
-  const m = { Spell:'SpellDisplay', Feat:'FeatDisplay', Class:'ClassDisplay', Item:'MagicItemsDisplay', Monster:'MonsterDisplay' };
+  const m = { Spell:'SpellDisplay', Feat:'FeatDisplay', Class:'ClassDisplay', Race:'Races', Item:'MagicItemsDisplay', Monster:'MonsterDisplay' };
   return `https://www.aonprd.com/${m[type]||'Search'}.aspx?ItemName=${encodeURIComponent(name)}`;
 }
 function pfUrl(name, type) {
-  const m = { Spell:'magic/all-spells', Feat:'feats', Class:'classes/core-classes', Item:'magic-items', Monster:'gamemastering/monsters-foes' };
+  const m = { Spell:'magic/all-spells', Feat:'feats', Class:'classes/core-classes', Race:'races', Item:'magic-items', Monster:'gamemastering/monsters-foes' };
   const slug = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   return `https://www.d20pfsrd.com/${m[type]||''}/${slug}/`;
 }
 function entryId(name, type) { return `${type}:${name}`; }
 function esc(s='') { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function typeCls(t) { return 'tb-' + t.toLowerCase(); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTOCOMPLETE
+// ═══════════════════════════════════════════════════════════════════════════
+let _acIndex = -1;
+
+function updateAutocomplete() {
+  const raw = document.getElementById('search-input').value.trim();
+  const dd  = document.getElementById('ac-dropdown');
+  _acIndex  = -1;
+
+  if (raw.length < 2) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+
+  const lq = raw.toLowerCase(), tf = S.typeFilter;
+  const hits = [];
+
+  if (!tf || tf === 'Spell')
+    SPELLS.filter(s => s.n.toLowerCase().includes(lq)).slice(0, 8)
+      .forEach(s => hits.push({ name:s.n, type:'Spell', meta:s.s + (s.l ? ' · Lvl ' + s.l : '') }));
+
+  if (!tf || tf === 'Feat')
+    FEATS.filter(f => f.n.toLowerCase().includes(lq)).slice(0, 8)
+      .forEach(f => hits.push({ name:f.n, type:'Feat', meta:f.t }));
+
+  if (!tf || tf === 'Class')
+    CLASSES.filter(c => c.toLowerCase().includes(lq)).slice(0, 5)
+      .forEach(c => hits.push({ name:c, type:'Class', meta:'Class' }));
+
+  if (!tf || tf === 'Race')
+    RACES.filter(r => r.toLowerCase().includes(lq)).slice(0, 5)
+      .forEach(r => hits.push({ name:r, type:'Race', meta:'Race' }));
+
+  // Sort: exact match first, then startsWith, then contains
+  hits.sort((a, b) => {
+    const [al, bl] = [a.name.toLowerCase(), b.name.toLowerCase()];
+    if (al === lq && bl !== lq) return -1;
+    if (al !== lq && bl === lq) return 1;
+    if (al.startsWith(lq) && !bl.startsWith(lq)) return -1;
+    if (!al.startsWith(lq) && bl.startsWith(lq)) return 1;
+    return al.localeCompare(bl);
+  });
+
+  if (!hits.length) { dd.style.display = 'none'; dd.innerHTML = ''; return; }
+
+  dd.innerHTML = '';
+  hits.slice(0, 10).forEach((h, i) => {
+    const item = document.createElement('div');
+    item.className = 'ac-item';
+    item.dataset.idx = i;
+
+    // Highlight the matching portion
+    const lo = h.name.toLowerCase();
+    const start = lo.indexOf(lq);
+    let highlighted = esc(h.name);
+    if (start >= 0) {
+      highlighted =
+        esc(h.name.slice(0, start)) +
+        '<mark>' + esc(h.name.slice(start, start + lq.length)) + '</mark>' +
+        esc(h.name.slice(start + lq.length));
+    }
+
+    item.innerHTML = `
+      <span class="type-badge ${typeCls(h.type)}">${h.type}</span>
+      <span class="ac-name">${highlighted}</span>
+      <span class="ac-meta">${esc(h.meta)}</span>`;
+
+    item.onmousedown = e => {
+      e.preventDefault(); // prevent input blur
+      selectAutocomplete(h);
+    };
+    dd.appendChild(item);
+  });
+
+  dd.style.display = 'block';
+}
+
+function selectAutocomplete(h) {
+  document.getElementById('search-input').value = h.name;
+  closeAutocomplete();
+  // Directly open the entry
+  const entry = { id: entryId(h.name, h.type), name: h.name, type: h.type, meta: h.meta };
+  S.results = [entry];
+  renderResults();
+  openEntry(entry);
+}
+
+function closeAutocomplete() {
+  const dd = document.getElementById('ac-dropdown');
+  dd.style.display = 'none';
+  dd.innerHTML = '';
+  _acIndex = -1;
+}
+
+function handleSearchKey(e) {
+  const dd = document.getElementById('ac-dropdown');
+  const items = dd.querySelectorAll('.ac-item');
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _acIndex = Math.min(_acIndex + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('selected', i === _acIndex));
+    return;
+  }
+  if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _acIndex = Math.max(_acIndex - 1, -1);
+    items.forEach((el, i) => el.classList.toggle('selected', i === _acIndex));
+    return;
+  }
+  if (e.key === 'Enter') {
+    if (_acIndex >= 0 && items[_acIndex]) {
+      items[_acIndex].onmousedown(e);
+    } else {
+      closeAutocomplete();
+      doSearch();
+    }
+    return;
+  }
+  if (e.key === 'Escape') {
+    closeAutocomplete();
+    return;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // SEARCH
@@ -523,10 +654,29 @@ function doSearch() {
     CLASSES.filter(c => c.toLowerCase().includes(lq)).slice(0,10)
       .forEach(c => results.push({ id:entryId(c,'Class'), name:c, type:'Class', meta:'Class' }));
 
+  if (!tf || tf === 'Race')
+    RACES.filter(r => r.toLowerCase().includes(lq)).slice(0,10)
+      .forEach(r => results.push({ id:entryId(r,'Race'), name:r, type:'Race', meta:'Race' }));
+
   ['Item','Monster'].forEach(t => {
     if (!tf || tf === t)
       results.push({ id:entryId(raw,t), name:raw, type:t, meta:'AI lookup' });
   });
+
+  // If no local matches found for Spell/Feat/Class/Race, also offer AI lookup for those types
+  const hasSpell  = results.some(r => r.type === 'Spell');
+  const hasFeat   = results.some(r => r.type === 'Feat');
+  const hasClass  = results.some(r => r.type === 'Class');
+  const hasRace   = results.some(r => r.type === 'Race');
+
+  if (!hasSpell  && (!tf || tf === 'Spell'))
+    results.push({ id:entryId(raw,'Spell'),  name:raw, type:'Spell',  meta:'AI lookup' });
+  if (!hasFeat   && (!tf || tf === 'Feat'))
+    results.push({ id:entryId(raw,'Feat'),   name:raw, type:'Feat',   meta:'AI lookup' });
+  if (!hasClass  && (!tf || tf === 'Class'))
+    results.push({ id:entryId(raw,'Class'),  name:raw, type:'Class',  meta:'AI lookup' });
+  if (!hasRace   && (!tf || tf === 'Race'))
+    results.push({ id:entryId(raw,'Race'),   name:raw, type:'Race',   meta:'AI lookup' });
 
   results.sort((a,b) => {
     const [al,bl] = [a.name.toLowerCase(), b.name.toLowerCase()];
@@ -596,6 +746,12 @@ End with: ${src}`,
     Item: `You are a Pathfinder 1E rules expert. Render the COMPLETE magic item entry for "${entry.name}".
 Output ONLY raw HTML using .stat-block — no markdown fences.
 Include: Aura strength and school, CL, slot, price, weight, full description with all abilities, Craft prerequisites and cost.
+End with: ${src}`,
+
+    Race: `You are a Pathfinder 1E rules expert. Render the COMPLETE race entry for "${entry.name}" from Pathfinder 1E.
+Output ONLY raw HTML using .stat-block — no markdown fences.
+Include: Racial description and lore, physical description, society, relations with other races, alignment and religion, adventurers. Then the full mechanical block: +2 to two ability scores and -2 if any, size, speed, all racial traits with full text (low-light vision, darkvision, etc.), alternate racial traits list, racial subtypes if any, favored class options for major classes.
+Use h2 for major sections, stat-line/stat-kv for the ability score modifiers and speed, p tags for descriptions.
 End with: ${src}`,
 
     Monster: `You are a Pathfinder 1E rules expert. Render the COMPLETE monster stat block for "${entry.name}".
@@ -713,6 +869,24 @@ async function openEntry(entry) {
 }
 
 function contentEl() { return document.getElementById('entry-content'); }
+
+async function refreshEntry() {
+  if (!S.activeEntry) return;
+  // Delete from IndexedDB cache then re-fetch
+  if (db) {
+    db.transaction(STORE, 'readwrite').objectStore(STORE).delete(S.activeEntry.id);
+  }
+  document.getElementById('cache-badge').style.display = 'none';
+  const entry = S.activeEntry;
+  const content = contentEl();
+  content.innerHTML = '<div class="loading-wrap"><div class="spinner"></div><div class="loading-msg">Re-fetching from Gemini…</div></div>';
+  try {
+    const html = await streamEntry(entry, content);
+    dbSet(entry.id, html);
+  } catch(e) {
+    content.innerHTML = `<div class="error-box"><strong>Could not load entry.</strong><br>${esc(e.message)}</div>`;
+  }
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BOOKMARKS
@@ -1105,6 +1279,10 @@ function makeBMItem(b) {
 // ═══════════════════════════════════════════════════════════════════════════
 document.getElementById('nc-overlay').addEventListener('click', function(e) {
   if (e.target === this) closeNewChar();
+});
+document.getElementById('search-input').addEventListener('blur', () => {
+  // Small delay so onmousedown on ac-item fires first
+  setTimeout(closeAutocomplete, 150);
 });
 document.getElementById('nf-overlay').addEventListener('click', function(e) {
   if (e.target === this) closeFolder();
