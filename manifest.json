@@ -1,0 +1,16 @@
+{
+  "name": "Pathfinder Companion",
+  "short_name": "PF Companion",
+  "description": "Pathfinder 1E reference companion with AI-powered rule lookup and character bookmarks",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#120e09",
+  "theme_color": "#120e09",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "categories": ["games", "reference"],
+  "lang": "en"
+}
