@@ -1,6 +1,6 @@
 'use strict';
 // CONFIG: Replace with your Cloudflare Worker URL
-const PROXY_URL = 'https://YOUR-WORKER.YOUR-NAME.workers.dev';
+const PROXY_URL = 'https://pf-proxy.neal-cronkite.workers.dev';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
