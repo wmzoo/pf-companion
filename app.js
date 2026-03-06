@@ -1,6 +1,6 @@
 'use strict';
 // CONFIG: Replace with your Cloudflare Worker URL
-const PROXY_URL = 'https://pf-proxy.neal-cronkite.workers.dev';
+const PROXY_URL = 'https://YOUR-WORKER.YOUR-NAME.workers.dev';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -768,12 +768,15 @@ End with: ${src}`,
 // STREAMING API CALL
 // ═══════════════════════════════════════════════════════════════════════════
 async function streamEntry(entry, contentEl) {
+  const tokensByType = { Spell:1500, Feat:1500, Class:4000, Race:2500, Item:2000, Monster:3000 };
+  const max_tokens = tokensByType[entry.type] || 2000;
+
   const response = await fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'gemini-2.5-flash',
-      max_tokens: 1500,
+      max_tokens,
       system: 'You are a Pathfinder 1E rules expert. Output ONLY raw HTML. Never use markdown code fences. Never output any text before or after the HTML div.',
       messages: [{ role: 'user', content: buildPrompt(entry) }],
     }),
