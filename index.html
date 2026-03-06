@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PF Companion">
-<meta name="theme-color" content="#120e09">
+<meta name="theme-color" content="#f5efe6">
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <title>Pathfinder Companion</title>
@@ -14,28 +14,28 @@
 <style>
 /* ── TOKENS ──────────────────────────────────────────────────────────────── */
 :root {
-  --ink:      #0f0c08;
-  --bg:       #1a140e;
-  --bg2:      #221a11;
-  --bg3:      #2c2115;
-  --bghov:    #36291a;
-  --gold:     #c8903a;
-  --gold-lt:  #e6b96a;
-  --gold-dk:  #7a5518;
-  --gold-dim: #3d2a0a;
+  --ink:      #f5efe6;
+  --bg:       #faf6f0;
+  --bg2:      #f0e8d8;
+  --bg3:      #e8ddc8;
+  --bghov:    #e0d4bc;
+  --gold:     #8a5c1a;
+  --gold-lt:  #6b4412;
+  --gold-dk:  #c4922a;
+  --gold-dim: #e8d8b8;
   --red:      #8b2020;
-  --red-lt:   #c04040;
-  --txt:      #ede0c4;
-  --txt2:     #b89860;
-  --txt3:     #7a5e38;
-  --txt4:     #4a3820;
-  --bdr:      #3a2a16;
-  --bdr-lt:   #5a4228;
-  --blue-bg:  #141e36; --blue-tx: #7090d0; --blue-bd: #1e2e50;
-  --grn-bg:   #111e14; --grn-tx:  #50a060; --grn-bd:  #1a3020;
-  --red-bg:   #2a1010; --red-tx:  #c06060; --red-bd:  #5a1a1a;
-  --amb-bg:   #2a1e08; --amb-tx:  #d0a040; --amb-bd:  #5a3e10;
-  --pur-bg:   #1a1030; --pur-tx:  #9060c0; --pur-bd:  #2e1850;
+  --red-lt:   #a03030;
+  --txt:      #2a1f0e;
+  --txt2:     #5a3e1a;
+  --txt3:     #7a5c2e;
+  --txt4:     #a08050;
+  --bdr:      #c8b898;
+  --bdr-lt:   #b0a080;
+  --blue-bg:  #e8eef8; --blue-tx: #2a4080; --blue-bd: #a0b4d8;
+  --grn-bg:   #e8f2ea; --grn-tx:  #1a5c2a; --grn-bd:  #90c0a0;
+  --red-bg:   #f8e8e8; --red-tx:  #7a1a1a; --red-bd:  #d09090;
+  --amb-bg:   #f8f0e0; --amb-tx:  #7a4e10; --amb-bd:  #d4aa60;
+  --pur-bg:   #f0ecf8; --pur-tx:  #4a2880; --pur-bd:  #b0a0d0;
   --radius: 6px;
   --font-ui:   'Cinzel', serif;
   --font-body: 'Crimson Pro', serif;
@@ -44,7 +44,7 @@
 html, body { height: 100%; overflow: hidden; -webkit-text-size-adjust: 100%; }
 body {
   font-family: var(--font-body);
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.6;
   background: var(--ink);
   color: var(--txt);
@@ -65,12 +65,12 @@ a:hover { color: var(--gold); }
   height: 56px;
   padding: 0 16px;
   padding-top: env(safe-area-inset-top);
-  background: linear-gradient(180deg, #080604 0%, var(--bg) 100%);
-  border-bottom: 1px solid var(--gold-dk);
+  background: linear-gradient(180deg, var(--bg3) 0%, var(--bg2) 100%);
+  border-bottom: 1px solid var(--bdr-lt);
   display: flex;
   align-items: center;
   gap: 14px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
   z-index: 50;
 }
 .logo {
@@ -81,9 +81,9 @@ a:hover { color: var(--gold); }
   letter-spacing: .07em;
   white-space: nowrap;
   flex-shrink: 0;
-  text-shadow: 0 0 28px rgba(200,144,58,.5);
+  text-shadow: none;
 }
-.logo span { color: var(--red-lt); }
+.logo span { color: var(--red); }
 .vr { width: 1px; height: 28px; background: var(--bdr-lt); flex-shrink: 0; }
 
 /* ── CHAR TABS ───────────────────────────────────────────────────────────── */
@@ -308,7 +308,7 @@ a:hover { color: var(--gold); }
 .entry-header {
   padding: 16px 24px 14px;
   border-bottom: 1px solid var(--bdr);
-  background: var(--bg2);
+  background: var(--bg3);
   flex-shrink: 0;
   display: flex;
   align-items: flex-start;
@@ -324,9 +324,9 @@ a:hover { color: var(--gold); }
   font-size: .58rem; font-weight: 700; letter-spacing: .05em;
   padding: 7px 14px; border-radius: 4px; cursor: pointer;
   transition: all .15s; white-space: nowrap;
-  background: linear-gradient(180deg, #7a5018 0%, #4e3210 100%);
+  background: linear-gradient(180deg, #c4922a 0%, #8a5c1a 100%);
   border: 1px solid var(--gold-dk);
-  color: var(--gold-lt);
+  color: #fff;
 }
 .btn-bm:hover { background: linear-gradient(180deg, #9a6820 0%, #7a5018 100%); }
 .btn-bm.on { background: rgba(200,144,58,.18); border-color: var(--gold); color: var(--gold-lt); }
@@ -408,13 +408,13 @@ a:hover { color: var(--gold); }
 .stat-block p { font-size: 1.05rem; color: var(--txt); line-height: 1.75; margin-bottom: 12px; }
 .stat-block ul, .stat-block ol { padding-left: 22px; margin-bottom: 12px; }
 .stat-block li { font-size: 1.05rem; color: var(--txt); line-height: 1.65; margin-bottom: 5px; }
-.stat-block strong { color: var(--gold-lt); font-weight: 600; }
+.stat-block strong { color: var(--gold); font-weight: 700; }
 .stat-block em { color: var(--txt2); font-style: italic; }
 .stat-block hr { border: none; border-top: 1px solid var(--bdr); margin: 20px 0; }
 .stat-block table { width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 1rem; }
 .stat-block th { font-family: var(--font-ui); font-size: .65rem; font-weight: 700; color: var(--txt3); text-transform: uppercase; letter-spacing: .06em; padding: 6px 10px; background: var(--bg2); border: 1px solid var(--bdr); text-align: left; }
 .stat-block td { padding: 6px 10px; border: 1px solid var(--bdr); color: var(--txt); vertical-align: top; }
-.stat-block tr:nth-child(even) td { background: rgba(255,255,255,.02); }
+.stat-block tr:nth-child(even) td { background: rgba(0,0,0,.04); }
 
 .stat-block .tag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
 .stat-block .tag {
@@ -460,7 +460,7 @@ a:hover { color: var(--gold); }
 .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
 .btn-cancel { font-family: var(--font-ui); font-size: .62rem; font-weight: 600; letter-spacing: .05em; padding: 8px 16px; border-radius: 4px; background: transparent; border: 1px solid var(--bdr-lt); color: var(--txt2); cursor: pointer; transition: all .15s; }
 .btn-cancel:hover { border-color: var(--gold-dk); color: var(--txt); }
-.btn-ok { font-family: var(--font-ui); font-size: .62rem; font-weight: 700; letter-spacing: .05em; padding: 8px 16px; border-radius: 4px; background: linear-gradient(180deg, #7a5018 0%, #4e3210 100%); border: 1px solid var(--gold-dk); color: var(--gold-lt); cursor: pointer; transition: all .15s; }
+.btn-ok { font-family: var(--font-ui); font-size: .62rem; font-weight: 700; letter-spacing: .05em; padding: 8px 16px; border-radius: 4px; background: linear-gradient(180deg, #c4922a 0%, #8a5c1a 100%); border: 1px solid var(--gold-dk); color: #fff; cursor: pointer; transition: all .15s; }
 .btn-ok:hover { background: linear-gradient(180deg, #9a6820 0%, #7a5018 100%); }
 
 /* ── RESPONSIVE ──────────────────────────────────────────────────────────── */
