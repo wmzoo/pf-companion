@@ -472,6 +472,111 @@ a:hover { color: var(--gold); }
   .entry-title { font-size: 1.2rem; }
   .results-scroll { max-height: 200px; }
 }
+
+/* Bookmark panel header */
+.bm-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 10px;
+}
+.btn-new-folder {
+  font-family: var(--font-ui);
+  font-size: .5rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  padding: 3px 8px;
+  border: 1px dashed var(--bdr-lt);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--txt4);
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn-new-folder:hover { border-color: var(--gold-dk); color: var(--gold); }
+
+/* Folder items */
+.folder-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background .1s;
+  user-select: none;
+}
+.folder-header:hover { background: var(--bghov); }
+.folder-arrow {
+  font-size: .65rem;
+  color: var(--txt4);
+  flex-shrink: 0;
+  transition: transform .15s;
+  width: 12px;
+  display: inline-block;
+}
+.folder-arrow.open { transform: rotate(90deg); }
+.folder-icon { font-size: .85rem; flex-shrink: 0; }
+.folder-name {
+  flex: 1;
+  font-family: var(--font-ui);
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--txt2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-header:hover .folder-name { color: var(--txt); }
+.folder-actions { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity .15s; }
+.folder-header:hover .folder-actions { opacity: 1; }
+.folder-btn {
+  background: none; border: none;
+  color: var(--txt4); font-size: .7rem;
+  padding: 1px 4px; cursor: pointer;
+  transition: color .15s;
+}
+.folder-btn:hover { color: var(--gold); }
+.folder-btn.del:hover { color: var(--red-lt); }
+.folder-contents { display: none; }
+.folder-contents.open { display: block; }
+.folder-contents .bm-item { padding-left: 28px; }
+
+/* Drop zones */
+.drop-zone {
+  height: 3px;
+  margin: 1px 14px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background .1s, height .1s;
+}
+.drop-zone.drag-over {
+  height: 6px;
+  background: var(--gold-dk);
+}
+.folder-drop-zone {
+  height: 28px;
+  margin: 0 14px 2px 28px;
+  border: 1px dashed transparent;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-ui);
+  font-size: .48rem;
+  color: transparent;
+  transition: all .15s;
+}
+.folder-drop-zone.drag-over {
+  border-color: var(--gold-dk);
+  color: var(--txt4);
+  background: rgba(200,144,58,.05);
+}
+
+/* Dragging state */
+.bm-item.dragging { opacity: .4; }
 </style>
 </head>
 <body>
@@ -505,7 +610,10 @@ a:hover { color: var(--gold); }
       <div class="results-scroll" id="results-list"></div>
     </div>
     <div class="bm-panel">
-      <div class="sb-label" id="bm-label">Bookmarks</div>
+      <div class="bm-panel-header">
+        <div class="sb-label" id="bm-label">Bookmarks</div>
+        <button class="btn-new-folder" onclick="openNewFolder()" title="New folder">+ Folder</button>
+      </div>
       <div id="bm-list"></div>
     </div>
   </aside>
@@ -556,6 +664,20 @@ a:hover { color: var(--gold); }
 </div>
 
 <!-- JS injected by part 3 & 4 -->
+
+<!-- NEW FOLDER MODAL -->
+<div class="overlay" id="nf-overlay">
+  <div class="modal">
+    <div class="modal-title" id="nf-title">New Folder</div>
+    <input class="modal-input" id="nf-input" type="text" placeholder="Folder name…"
+      onkeydown="if(event.key==='Enter')confirmFolder()">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeFolder()">Cancel</button>
+      <button class="btn-ok" onclick="confirmFolder()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script src="./app.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 'use strict';
 // CONFIG: Replace with your Cloudflare Worker URL
-const PROXY_URL = 'https://pf-proxy.neal-cronkite.workers.dev';
+const PROXY_URL = 'https://YOUR-WORKER.YOUR-NAME.workers.dev';
 
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -449,17 +449,38 @@ function dbSet(id, html) {
 const SK = 'pfc_v6';
 const TYPES = ['Spell','Feat','Class','Item','Monster'];
 
-let S = { chars:[], activeChar:null, bookmarks:{}, typeFilter:null, results:[], activeEntry:null };
+let S = { chars:[], activeChar:null, bookmarks:{}, folders:{}, folderCollapsed:{}, typeFilter:null, results:[], activeEntry:null };
+
+// bookmarks[charId] = [ {id, name, type, meta, folderId?} ]
+// folders[charId]   = [ {id, name} ]
 
 function saveState() {
-  try { localStorage.setItem(SK, JSON.stringify({ chars:S.chars, activeChar:S.activeChar, bookmarks:S.bookmarks })); } catch(e) {}
+  try {
+    localStorage.setItem(SK, JSON.stringify({
+      chars: S.chars,
+      activeChar: S.activeChar,
+      bookmarks: S.bookmarks,
+      folders: S.folders,
+      folderCollapsed: S.folderCollapsed,
+    }));
+  } catch(e) {}
 }
 function loadState() {
   try {
     const d = JSON.parse(localStorage.getItem(SK) || '{}');
     S.chars = d.chars || [];
     S.activeChar = d.activeChar || null;
-    S.bookmarks = d.bookmarks || {};
+    S.folderCollapsed = d.folderCollapsed || {};
+    S.folders = d.folders || {};
+    // Migrate old flat bookmark arrays
+    S.bookmarks = {};
+    const raw = d.bookmarks || {};
+    S.chars.forEach(c => {
+      const bms = raw[c.id] || [];
+      // Old format was array of {id,name,type,meta} — keep as-is, folderId defaults to undefined
+      S.bookmarks[c.id] = bms;
+      if (!S.folders[c.id]) S.folders[c.id] = [];
+    });
     if (S.activeChar && !S.chars.find(c => c.id === S.activeChar))
       S.activeChar = S.chars[0]?.id || null;
   } catch(e) {}
@@ -753,6 +774,7 @@ function confirmNewChar() {
   const id = 'c' + Date.now();
   S.chars.push({ id, name });
   S.bookmarks[id] = [];
+  S.folders[id] = [];
   S.activeChar = id;
   saveState(); closeNewChar(); renderCharStrip(); renderBookmarks();
 }
@@ -760,8 +782,62 @@ function deleteChar(id) {
   if (!confirm('Remove this character and all their bookmarks?')) return;
   S.chars = S.chars.filter(c => c.id !== id);
   delete S.bookmarks[id];
+  delete S.folders[id];
   if (S.activeChar === id) S.activeChar = S.chars[0]?.id || null;
   saveState(); renderCharStrip(); renderBookmarks();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FOLDERS
+// ═══════════════════════════════════════════════════════════════════════════
+let _folderEditId = null; // null = creating new, string = editing existing
+
+function activeFolders() { return S.activeChar ? (S.folders[S.activeChar] || []) : []; }
+
+function openNewFolder() {
+  if (!S.activeChar) { alert('Create a character first!'); return; }
+  _folderEditId = null;
+  document.getElementById('nf-title').textContent = 'New Folder';
+  document.getElementById('nf-input').value = '';
+  document.getElementById('nf-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('nf-input').focus(), 50);
+}
+function openRenameFolder(id) {
+  _folderEditId = id;
+  const folder = activeFolders().find(f => f.id === id);
+  if (!folder) return;
+  document.getElementById('nf-title').textContent = 'Rename Folder';
+  document.getElementById('nf-input').value = folder.name;
+  document.getElementById('nf-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('nf-input').focus(), 50);
+}
+function closeFolder() { document.getElementById('nf-overlay').classList.remove('open'); }
+function confirmFolder() {
+  const name = document.getElementById('nf-input').value.trim();
+  if (!name) return;
+  if (_folderEditId) {
+    const folder = activeFolders().find(f => f.id === _folderEditId);
+    if (folder) folder.name = name;
+  } else {
+    if (!S.folders[S.activeChar]) S.folders[S.activeChar] = [];
+    S.folders[S.activeChar].push({ id: 'f' + Date.now(), name });
+  }
+  saveState(); closeFolder(); renderBookmarks();
+}
+function deleteFolder(id) {
+  if (!confirm('Delete this folder? Bookmarks inside will move to ungrouped.')) return;
+  // Remove folder membership from bookmarks
+  (S.bookmarks[S.activeChar] || []).forEach(b => { if (b.folderId === id) delete b.folderId; });
+  S.folders[S.activeChar] = activeFolders().filter(f => f.id !== id);
+  saveState(); renderBookmarks();
+}
+function toggleFolder(id) {
+  const key = S.activeChar + ':' + id;
+  S.folderCollapsed[key] = !S.folderCollapsed[key];
+  saveState(); renderBookmarks();
+}
+function isFolderOpen(id) {
+  return !S.folderCollapsed[S.activeChar + ':' + id];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -818,40 +894,210 @@ function renderResults() {
   });
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+// DRAG AND DROP
+// ═══════════════════════════════════════════════════════════════════════════
+let _drag = null; // { bmId, sourceType }  — what we're dragging
+
+function makeDraggable(el, bmId) {
+  // Mouse drag
+  el.draggable = true;
+  el.addEventListener('dragstart', e => {
+    _drag = { bmId };
+    el.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  el.addEventListener('dragend', () => {
+    _drag = null;
+    el.classList.remove('dragging');
+    clearDropHighlights();
+  });
+
+  // Touch drag (long-press)
+  let touchTimer = null, touchStartY = 0;
+  el.addEventListener('touchstart', e => {
+    touchStartY = e.touches[0].clientY;
+    touchTimer = setTimeout(() => {
+      _drag = { bmId };
+      el.classList.add('dragging');
+      navigator.vibrate && navigator.vibrate(40);
+    }, 500);
+  }, { passive: true });
+  el.addEventListener('touchmove', e => {
+    if (Math.abs(e.touches[0].clientY - touchStartY) > 10) {
+      clearTimeout(touchTimer); touchTimer = null;
+    }
+    if (!_drag) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dz = target?.closest('.drop-zone, .folder-drop-zone');
+    clearDropHighlights();
+    if (dz) dz.classList.add('drag-over');
+  }, { passive: false });
+  el.addEventListener('touchend', e => {
+    clearTimeout(touchTimer);
+    if (!_drag) return;
+    const touch = e.changedTouches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dz = target?.closest('.drop-zone, .folder-drop-zone');
+    if (dz) handleDrop(dz);
+    el.classList.remove('dragging');
+    _drag = null;
+    clearDropHighlights();
+  });
+}
+
+function clearDropHighlights() {
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+
+function makeDropZone(el) {
+  el.addEventListener('dragover', e => { e.preventDefault(); clearDropHighlights(); el.classList.add('drag-over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+  el.addEventListener('drop', e => { e.preventDefault(); handleDrop(el); });
+}
+
+function handleDrop(dropZone) {
+  clearDropHighlights();
+  if (!_drag || !S.activeChar) return;
+  const { bmId } = _drag;
+  const bms = S.bookmarks[S.activeChar];
+  const bmIdx = bms.findIndex(b => b.id === bmId);
+  if (bmIdx < 0) return;
+  const [bm] = bms.splice(bmIdx, 1);
+
+  if (dropZone.dataset.folderId) {
+    // Drop into a folder
+    bm.folderId = dropZone.dataset.folderId;
+    bms.push(bm);
+  } else if (dropZone.dataset.afterBm) {
+    // Drop after a specific bookmark
+    delete bm.folderId;
+    const afterIdx = bms.findIndex(b => b.id === dropZone.dataset.afterBm);
+    bms.splice(afterIdx + 1, 0, bm);
+  } else if (dropZone.dataset.afterFolder) {
+    // Drop after a folder (into ungrouped area before next folder)
+    delete bm.folderId;
+    bms.push(bm);
+  } else {
+    // Drop at top
+    delete bm.folderId;
+    bms.unshift(bm);
+  }
+
+  S.bookmarks[S.activeChar] = bms;
+  saveState(); renderBookmarks();
+}
+
 function renderBookmarks() {
   const list = document.getElementById('bm-list');
   list.innerHTML = '';
+
+  const folderBtn = document.getElementById('btn-new-folder');
+  if (folderBtn) folderBtn.style.display = S.activeChar ? '' : 'none';
 
   if (!S.activeChar) {
     list.innerHTML = '<p class="sb-empty">Create a character to start bookmarking entries.</p>';
     return;
   }
   const bms = activeBMs();
-  if (!bms.length) {
+  const folders = activeFolders();
+
+  if (!bms.length && !folders.length) {
     list.innerHTML = '<p class="sb-empty">No bookmarks yet.<br>Search an entry and tap ☆ to save it here.</p>';
     return;
   }
 
+  // Top drop zone
+  const topDz = document.createElement('div');
+  topDz.className = 'drop-zone';
+  topDz.dataset.afterBm = '__top__';
+  makeDropZone(topDz);
+  list.appendChild(topDz);
+
+  // Ungrouped bookmarks (no folderId)
+  const ungrouped = bms.filter(b => !b.folderId);
   const groups = {};
   TYPES.forEach(t => groups[t] = []);
-  bms.forEach(b => { if (groups[b.type]) groups[b.type].push(b); });
+  ungrouped.forEach(b => { if (groups[b.type]) groups[b.type].push(b); });
 
   TYPES.forEach(type => {
     if (!groups[type].length) return;
     const g = document.createElement('div');
     g.innerHTML = `<div class="bm-group-title">${type}s</div>`;
     groups[type].forEach(b => {
-      const item = document.createElement('div');
-      item.className = 'bm-item' + (S.activeEntry?.id === b.id ? ' active' : '');
-      item.innerHTML = `
-        <span class="type-badge ${typeCls(b.type)}" style="font-size:.42rem;padding:1px 4px">${b.type[0]}</span>
-        <span class="bm-name">${esc(b.name)}</span>
-        <button class="bm-del" onclick="event.stopPropagation();removeBM('${esc(b.id)}')" title="Remove">✕</button>`;
-      item.onclick = () => openEntry(b);
-      g.appendChild(item);
+      g.appendChild(makeBMItem(b));
+      const dz = document.createElement('div');
+      dz.className = 'drop-zone';
+      dz.dataset.afterBm = b.id;
+      makeDropZone(dz);
+      g.appendChild(dz);
     });
     list.appendChild(g);
   });
+
+  // Folders section
+  if (folders.length) {
+    const folderSection = document.createElement('div');
+
+    folders.forEach(folder => {
+      const isOpen = isFolderOpen(folder.id);
+      const folderBms = bms.filter(b => b.folderId === folder.id);
+
+      // Folder header
+      const hdr = document.createElement('div');
+      hdr.className = 'folder-header';
+      hdr.innerHTML = `
+        <span class="folder-arrow ${isOpen ? 'open' : ''}">&#9658;</span>
+        <span class="folder-icon">${isOpen ? '📂' : '📁'}</span>
+        <span class="folder-name">${esc(folder.name)}</span>
+        <span class="folder-actions">
+          <button class="folder-btn" onclick="event.stopPropagation();openRenameFolder('${folder.id}')" title="Rename">✏</button>
+          <button class="folder-btn del" onclick="event.stopPropagation();deleteFolder('${folder.id}')" title="Delete">✕</button>
+        </span>`;
+      hdr.onclick = () => toggleFolder(folder.id);
+      folderSection.appendChild(hdr);
+
+      // Folder contents
+      const contents = document.createElement('div');
+      contents.className = 'folder-contents' + (isOpen ? ' open' : '');
+
+      // Drop zone to add to folder
+      const folderDz = document.createElement('div');
+      folderDz.className = 'folder-drop-zone';
+      folderDz.dataset.folderId = folder.id;
+      folderDz.textContent = 'Drop here to add';
+      makeDropZone(folderDz);
+
+      if (folderBms.length) {
+        folderBms.forEach(b => {
+          contents.appendChild(makeBMItem(b));
+          const dz = document.createElement('div');
+          dz.className = 'drop-zone';
+          dz.dataset.afterBm = b.id;
+          makeDropZone(dz);
+          contents.appendChild(dz);
+        });
+      }
+      contents.appendChild(folderDz);
+      folderSection.appendChild(contents);
+    });
+
+    list.appendChild(folderSection);
+  }
+}
+
+function makeBMItem(b) {
+  const item = document.createElement('div');
+  item.className = 'bm-item' + (S.activeEntry?.id === b.id ? ' active' : '');
+  item.innerHTML = `
+    <span class="type-badge ${typeCls(b.type)}" style="font-size:.42rem;padding:1px 4px">${b.type[0]}</span>
+    <span class="bm-name">${esc(b.name)}</span>
+    <button class="bm-del" onclick="event.stopPropagation();removeBM('${esc(b.id)}')" title="Remove">✕</button>`;
+  item.onclick = () => openEntry(b);
+  makeDraggable(item, b.id);
+  return item;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -859,6 +1105,9 @@ function renderBookmarks() {
 // ═══════════════════════════════════════════════════════════════════════════
 document.getElementById('nc-overlay').addEventListener('click', function(e) {
   if (e.target === this) closeNewChar();
+});
+document.getElementById('nf-overlay').addEventListener('click', function(e) {
+  if (e.target === this) closeFolder();
 });
 
 async function init() {
