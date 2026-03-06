@@ -1,4 +1,7 @@
 'use strict';
+// ── CONFIG — replace this URL after setting up your Cloudflare Worker ──────
+const PROXY_URL = 'https://YOUR-WORKER.YOUR-NAME.workers.dev';
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DATA — full spell & feat index for instant search
@@ -588,7 +591,7 @@ End with: ${src}`,
 // STREAMING API CALL
 // ═══════════════════════════════════════════════════════════════════════════
 async function streamEntry(entry, contentEl) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const response = await fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
