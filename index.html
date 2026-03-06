@@ -150,6 +150,7 @@ a:hover { color: var(--gold); }
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0;
 }
 .sb-block { border-bottom: 1px solid var(--bdr); flex-shrink: 0; }
 .sb-label {
@@ -274,7 +275,7 @@ a:hover { color: var(--gold); }
 .sb-empty { font-size: .92rem; color: var(--txt4); font-style: italic; padding: 10px 16px; line-height: 1.6; }
 
 /* ── MAIN ────────────────────────────────────────────────────────────────── */
-#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); min-height: 0; }
 
 /* Welcome */
 #welcome {
@@ -303,7 +304,7 @@ a:hover { color: var(--gold); }
 }
 
 /* Entry view */
-#entry-view { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+#entry-view { flex: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
 .entry-header {
   padding: 16px 24px 14px;
   border-bottom: 1px solid var(--bdr);
